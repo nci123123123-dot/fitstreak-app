@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Alert, ActivityIndicator, Modal, Image, FlatList, Dimensions, Animated, TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -193,13 +193,14 @@ const peStyles = StyleSheet.create({
 
 // ── 날짜 상세 모달 ──────────────────────────────────
 function DayDetailModal({ log, onClose }: { log: CalendarLog; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
   const photo = parsePhoto(log.photoUrl);
   const exercises = parseExercises(log.note);
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.modalWrap}>
-        <View style={styles.modalHeader}>
+        <View style={[styles.modalHeader, { paddingTop: insets.top + 16 }]}>
           <Text style={styles.modalTitle}>{log.localDate}</Text>
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.modalClose}>닫기</Text>
@@ -249,6 +250,7 @@ function SocialModal({
   onClose:          () => void;
   onToggleFollow?:  (targetId: string, currentlyFollowing: boolean) => Promise<void>;
 }) {
+  const insets = useSafeAreaInsets();
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [localUsers, setLocalUsers] = useState<SocialUser[]>(users);
 
@@ -268,7 +270,7 @@ function SocialModal({
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.modalWrap}>
-        <View style={styles.modalHeader}>
+        <View style={[styles.modalHeader, { paddingTop: insets.top + 16 }]}>
           <Text style={styles.modalTitle}>{title}</Text>
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.modalClose}>닫기</Text>
@@ -465,6 +467,7 @@ const hStyles = StyleSheet.create({
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [selectedLog,  setSelectedLog]  = useState<CalendarLog | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [socialType,   setSocialType]   = useState<'followers' | 'following' | null>(null);
@@ -706,7 +709,7 @@ export default function ProfileScreen() {
         <Animated.View style={[StyleSheet.absoluteFill, styles.modalWrap, { transform: [{ translateX: settingsAnim }], overflow: 'hidden' }]}>
           {/* 설정 메인 */}
           <View style={StyleSheet.absoluteFill}>
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, { paddingTop: insets.top + 16 }]}>
               <Text style={styles.modalTitle}>설정</Text>
               <TouchableOpacity onPress={() => { closePrivacy(); closeSettings(); }}>
                 <Text style={styles.modalClose}>닫기</Text>
@@ -738,7 +741,7 @@ export default function ProfileScreen() {
           {/* 개인정보 보호 */}
           {showPrivacy && (
             <Animated.View style={[StyleSheet.absoluteFill, styles.modalWrap, { transform: [{ translateX: slideAnim }] }]}>
-              <View style={styles.modalHeader}>
+              <View style={[styles.modalHeader, { paddingTop: insets.top + 16 }]}>
                 <TouchableOpacity onPress={closePrivacy}>
                   <Text style={styles.modalClose}>‹ 뒤로</Text>
                 </TouchableOpacity>
@@ -776,7 +779,7 @@ export default function ProfileScreen() {
           {/* 운동 계획 */}
           {showSchedulePanel && (
             <Animated.View style={[StyleSheet.absoluteFill, styles.modalWrap, { transform: [{ translateX: scheduleSlideAnim }] }]}>
-              <View style={styles.modalHeader}>
+              <View style={[styles.modalHeader, { paddingTop: insets.top + 16 }]}>
                 <TouchableOpacity onPress={closeSchedulePanel}>
                   <Text style={styles.modalClose}>‹ 뒤로</Text>
                 </TouchableOpacity>
@@ -1093,7 +1096,7 @@ const styles = StyleSheet.create({
 
   // ── 모달 공통
   modalWrap:   { flex: 1, backgroundColor: '#0a0a0a' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
   modalTitle:  { color: '#fff', fontSize: 20, fontWeight: '700' },
   modalClose:  { color: '#4f8ef7', fontSize: 16, fontWeight: '500' },
 
