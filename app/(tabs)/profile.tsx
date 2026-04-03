@@ -39,7 +39,8 @@ interface ExerciseEntry {
   reps?:       number;
   weight?:     number;
 }
-interface SocialUser { id: string; displayName: string; }
+interface SocialUser { id: string; displayName: string; isFollowing?: boolean; }
+interface RankEntry  { id: string; isMe: boolean; currentStreak: number; }
 interface GymInfo { gymName: string | null; gymLat: number | null; gymLng: number | null; defaultVisibility: string; profilePhoto?: string | null; }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -240,7 +241,30 @@ function DayDetailModal({ log, onClose }: { log: CalendarLog; onClose: () => voi
 }
 
 // ── 소셜 목록 모달 ──────────────────────────────────
-function SocialModal({ title, users, onClose }: { title: string; users: SocialUser[]; onClose: () => void }) {
+function SocialModal({
+  title, users, onClose, onToggleFollow,
+}: {
+  title:            string;
+  users:            SocialUser[];
+  onClose:          () => void;
+  onToggleFollow?:  (targetId: string, currentlyFollowing: boolean) => Promise<void>;
+}) {
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [localUsers, setLocalUsers] = useState<SocialUser[]>(users);
+
+  async function handleToggle(u: SocialUser) {
+    if (!onToggleFollow || pendingIds.has(u.id)) return;
+    setPendingIds(prev => new Set(prev).add(u.id));
+    try {
+      await onToggleFollow(u.id, !!u.isFollowing);
+      setLocalUsers(prev =>
+        prev.map(x => x.id === u.id ? { ...x, isFollowing: !x.isFollowing } : x)
+      );
+    } finally {
+      setPendingIds(prev => { const s = new Set(prev); s.delete(u.id); return s; });
+    }
+  }
+
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.modalWrap}>
@@ -250,21 +274,38 @@ function SocialModal({ title, users, onClose }: { title: string; users: SocialUs
             <Text style={styles.modalClose}>닫기</Text>
           </TouchableOpacity>
         </View>
-        {users.length === 0 ? (
+        {localUsers.length === 0 ? (
           <Text style={styles.emptyList}>아직 없어요</Text>
         ) : (
           <FlatList
-            data={users}
+            data={localUsers}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingHorizontal: 20 }}
-            renderItem={({ item }) => (
-              <View style={styles.userRow}>
-                <View style={styles.userAvatar}>
-                  <Text style={styles.userAvatarText}>{item.displayName[0]}</Text>
+            renderItem={({ item }) => {
+              const pending = pendingIds.has(item.id);
+              return (
+                <View style={styles.userRow}>
+                  <View style={styles.userAvatar}>
+                    <Text style={styles.userAvatarText}>{item.displayName[0]}</Text>
+                  </View>
+                  <Text style={[styles.userDisplayName, { flex: 1 }]}>{item.displayName}</Text>
+                  {onToggleFollow && (
+                    <TouchableOpacity
+                      style={[styles.socialFollowBtn, item.isFollowing && styles.socialFollowingBtn]}
+                      onPress={() => handleToggle(item)}
+                      disabled={pending}
+                    >
+                      {pending
+                        ? <ActivityIndicator size="small" color={item.isFollowing ? '#8e8e93' : '#fff'} />
+                        : <Text style={[styles.socialFollowBtnText, item.isFollowing && styles.socialFollowingBtnText]}>
+                            {item.isFollowing ? '언팔로우' : '팔로우'}
+                          </Text>
+                      }
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <Text style={styles.userDisplayName}>{item.displayName}</Text>
-              </View>
-            )}
+              );
+            }}
           />
         )}
       </View>
@@ -486,17 +527,40 @@ export default function ProfileScreen() {
     useCallback(() => { refetchProfile(); }, [])
   );
 
-  const { data: followersData } = useQuery({
+  const { data: followersData, refetch: refetchFollowers } = useQuery({
     queryKey: ['followers', user?.id],
     queryFn:  () => api.get<{ users: SocialUser[] }>(`/users/${user!.id}/followers`),
     enabled:  !!user && socialType === 'followers',
   });
 
-  const { data: followingData } = useQuery({
+  const { data: followingData, refetch: refetchFollowing } = useQuery({
     queryKey: ['following', user?.id],
     queryFn:  () => api.get<{ users: SocialUser[] }>(`/users/${user!.id}/following`),
     enabled:  !!user && socialType === 'following',
   });
+
+  const { data: rankingData } = useQuery({
+    queryKey: ['friendsRanking'],
+    queryFn:  () => api.get<{ ranking: RankEntry[] }>('/users/me/friends/ranking'),
+    enabled:  !!user,
+    staleTime: 60_000,
+  });
+
+  const myRankIdx   = rankingData?.ranking.findIndex(r => r.isMe) ?? -1;
+  const myRank      = myRankIdx >= 0 ? myRankIdx + 1 : null;
+  const rankTotal   = rankingData?.ranking.length ?? 0;
+
+  async function toggleSocialFollow(targetId: string, currentlyFollowing: boolean) {
+    if (currentlyFollowing) {
+      await api.delete(`/users/${targetId}/follow`);
+    } else {
+      await api.post(`/users/${targetId}/follow`);
+    }
+    queryClient.invalidateQueries({ queryKey: ['profile'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['friendsRanking'] });
+    refetchFollowers();
+    refetchFollowing();
+  }
 
   const { data: gymData } = useQuery({
     queryKey: ['gym'],
@@ -775,6 +839,7 @@ export default function ProfileScreen() {
           title="팔로워"
           users={followersData?.users ?? []}
           onClose={() => setSocialType(null)}
+          onToggleFollow={toggleSocialFollow}
         />
       )}
 
@@ -784,6 +849,7 @@ export default function ProfileScreen() {
           title="팔로잉"
           users={followingData?.users ?? []}
           onClose={() => setSocialType(null)}
+          onToggleFollow={toggleSocialFollow}
         />
       )}
 
@@ -811,6 +877,14 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.editProfileBtn} onPress={() => setShowEditProfile(true)}>
             <Text style={styles.editProfileBtnText}>프로필 편집</Text>
           </TouchableOpacity>
+
+          {myRank !== null && rankTotal > 1 && (
+            <View style={styles.rankBadge}>
+              <Text style={styles.rankBadgeText}>
+                {myRank === 1 ? '👑' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : '🏅'} 친구 중 {myRank}위 / {rankTotal}명
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* ── 통계 3칸 ── */}
@@ -1054,6 +1128,16 @@ const styles = StyleSheet.create({
   // ── 프로필 편집 버튼
   editProfileBtn:     { marginTop: 12, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, backgroundColor: '#1c1c1e', borderWidth: 0.5, borderColor: '#3a3a3c' },
   editProfileBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+
+  // ── 랭킹 뱃지
+  rankBadge:     { marginTop: 10, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(79,142,247,0.12)', borderWidth: 0.5, borderColor: 'rgba(79,142,247,0.4)' },
+  rankBadgeText: { color: '#4f8ef7', fontSize: 13, fontWeight: '700' },
+
+  // ── 팔로워/팔로잉 모달 버튼
+  socialFollowBtn:         { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, backgroundColor: '#4f8ef7', minWidth: 70, alignItems: 'center' },
+  socialFollowingBtn:      { backgroundColor: '#2c2c2e' },
+  socialFollowBtnText:     { color: '#fff', fontSize: 13, fontWeight: '700' },
+  socialFollowingBtnText:  { color: '#8e8e93' },
 
   // ── 운동 계획 (설정 패널용)
   scheduleDays:         { flexDirection: 'row', justifyContent: 'space-between' },
