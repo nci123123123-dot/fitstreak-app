@@ -2,9 +2,9 @@ import { useState, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, ScrollView, Image,
-  Dimensions, Modal, Platform,
+  Dimensions, Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
@@ -178,6 +178,7 @@ const bannerStyles = StyleSheet.create({
 
 // ── 메인 화면 ────────────────────────────────────────
 export default function LogScreen() {
+  const insets = useSafeAreaInsets();
   const [exercises, setExercises]   = useState<ExerciseSet[]>([]);
   const [loading, setLoading]       = useState(false);
   const [photoUri, setPhotoUri]     = useState<string | null>(null);
@@ -510,7 +511,7 @@ export default function LogScreen() {
 
         {/* ── 고정 제출 버튼 ── */}
         {gpsStatus === 'verified' && (
-          <View style={styles.stickyBottom}>
+          <View style={[styles.stickyBottom, { paddingBottom: insets.bottom + 12 }]}>
             <TouchableOpacity
               style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
               onPress={handleLog}
@@ -600,7 +601,7 @@ const styles = StyleSheet.create({
   lockSub:     { color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   // 하단 고정 버튼
-  stickyBottom:      { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 8 : 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.card, backgroundColor: C.bg },
+  stickyBottom:      { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.card, backgroundColor: C.bg },
   submitBtn:         { backgroundColor: C.accent, borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center' },
   submitBtnDisabled: { backgroundColor: C.card },
   submitBtnText:     { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: -0.2 },
