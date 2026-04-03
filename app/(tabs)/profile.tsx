@@ -721,7 +721,7 @@ export default function ProfileScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.settingsItemLabel}>운동 계획</Text>
                   <Text style={styles.menuSub}>
-                    {scheduleDays.length === 0 ? '미설정' : `주 ${scheduleDays.length}회 · ${scheduleDays.map(d => ['일','월','화','수','목','금','토'][d]).join('')}요일`}
+                    {scheduleDays.length === 0 ? '미설정' : `주 ${scheduleDays.length}회 · ${scheduleDays.map(d => ['일','월','화','수','목','금','토'][d]).join('·')}`}
                   </Text>
                 </View>
                 <ChevronRightIcon />
@@ -811,7 +811,7 @@ export default function ProfileScreen() {
                   <Text style={styles.scheduleInfoText}>
                     {scheduleDays.length === 0
                       ? '요일을 선택해주세요'
-                      : `주 ${scheduleDays.length}회 · ${scheduleDays.map(d => ['일','월','화','수','목','금','토'][d]).join(', ')}요일에 운동`}
+                      : `주 ${scheduleDays.length}회 · ${scheduleDays.map(d => ['일','월','화','수','목','금','토'][d]).join('·')} 운동`}
                   </Text>
                 </View>
               </View>
