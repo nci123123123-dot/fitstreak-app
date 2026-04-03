@@ -299,7 +299,7 @@ export default function LogScreen() {
 
     if (gpsStatus === 'idle' || gpsStatus === 'no_gym') {
       return (
-        <TouchableOpacity style={[styles.gpsCard, styles.gpsCardTap]} onPress={checkGps} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.gpsCard, styles.gpsCardTap]} onPress={startWatchingGps} activeOpacity={0.8}>
           <View style={[styles.gpsIconBg, styles.gpsIconBlue]}>
             <LocationIcon size={18} color={C.accent} />
           </View>
@@ -337,7 +337,7 @@ export default function LogScreen() {
 
     if (gpsStatus === 'far') {
       return (
-        <TouchableOpacity style={[styles.gpsCard, styles.gpsCardRed]} onPress={checkGps} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.gpsCard, styles.gpsCardRed]} onPress={startWatchingGps} activeOpacity={0.8}>
           <View style={[styles.gpsIconBg, styles.gpsIconRed]}>
             <AlertCircleIcon size={18} color={C.red} strokeWidth={2} />
           </View>
