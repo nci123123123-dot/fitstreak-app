@@ -41,6 +41,9 @@ interface ExerciseEntry {
 }
 interface SocialUser { id: string; displayName: string; isFollowing?: boolean; }
 interface RankEntry  { id: string; isMe: boolean; currentStreak: number; }
+interface SplitSlot  { label: string; }
+interface SplitConfig { slots: SplitSlot[]; currentSlotIndex: number; }
+interface SplitData   { config: SplitConfig | null; todaySlot: SplitSlot | null; todaySlotIndex: number | null; }
 interface GymInfo { gymName: string | null; gymLat: number | null; gymLng: number | null; defaultVisibility: string; profilePhoto?: string | null; }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -189,6 +192,151 @@ const peStyles = StyleSheet.create({
   field:      { width: '100%', gap: 8 },
   fieldLabel: { color: '#8e8e93', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   fieldInput: { backgroundColor: '#1c1c1e', color: '#fff', fontSize: 16, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14 },
+});
+
+// ── 운동 분할 설정 패널 ─────────────────────────────
+const SPLIT_PRESETS: Record<number, string[]> = {
+  2: ['상체', '하체'],
+  3: ['등·이두', '가슴·삼두', '어깨·하체'],
+  4: ['등·이두', '가슴·삼두', '어깨', '하체'],
+  5: ['등', '가슴', '어깨', '이두·삼두', '하체'],
+  6: ['가슴', '등', '어깨', '팔', '하체', '코어'],
+};
+
+function SplitPanel({
+  insetTop, config, onClose, onSaved,
+}: {
+  insetTop: number;
+  config:   SplitConfig | null;
+  onClose:  () => void;
+  onSaved:  () => void;
+}) {
+  const [splitCount, setSplitCount] = useState<number>(config?.slots.length ?? 0);
+  const [labels, setLabels]         = useState<string[]>(
+    config?.slots.map(s => s.label) ?? []
+  );
+  const [saving, setSaving] = useState(false);
+
+  function applyPreset(n: number) {
+    setSplitCount(n);
+    setLabels(PRESET => SPLIT_PRESETS[n] ?? Array(n).fill(''));
+  }
+
+  // 슬롯 수 변경 시 라벨 배열 조정
+  function handleCountChange(n: number) {
+    setSplitCount(n);
+    if (n === 0) { setLabels([]); return; }
+    const preset = SPLIT_PRESETS[n];
+    if (preset) { setLabels(preset); return; }
+    // 커스텀: 기존 라벨 유지 + 부족한 건 빈 값으로
+    setLabels(prev => {
+      const next = [...prev];
+      while (next.length < n) next.push('');
+      return next.slice(0, n);
+    });
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const slots = splitCount === 0 ? null : labels.map(l => ({ label: l.trim() || '운동' }));
+      await api.put('/users/me/split', { slots });
+      onSaved();
+    } catch (e: any) {
+      Alert.alert('저장 실패', e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[splitStyles.header, { paddingTop: insetTop + 16 }]}>
+        <TouchableOpacity onPress={onClose}>
+          <Text style={splitStyles.back}>‹ 뒤로</Text>
+        </TouchableOpacity>
+        <Text style={splitStyles.title}>운동 분할</Text>
+        <TouchableOpacity onPress={handleSave} disabled={saving}>
+          {saving
+            ? <ActivityIndicator color="#4f8ef7" size="small" />
+            : <Text style={splitStyles.save}>저장</Text>}
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={splitStyles.body} showsVerticalScrollIndicator={false}>
+        {/* 분할 수 선택 */}
+        <Text style={splitStyles.sectionLabel}>분할 수</Text>
+        <View style={splitStyles.countRow}>
+          {[0, 2, 3, 4, 5, 6].map(n => (
+            <TouchableOpacity
+              key={n}
+              style={[splitStyles.countBtn, splitCount === n && splitStyles.countBtnOn]}
+              onPress={() => handleCountChange(n)}
+            >
+              <Text style={[splitStyles.countBtnText, splitCount === n && splitStyles.countBtnTextOn]}>
+                {n === 0 ? '없음' : `${n}분할`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {splitCount > 0 && (
+          <>
+            <Text style={[splitStyles.sectionLabel, { marginTop: 24 }]}>각 날의 운동 부위</Text>
+            <Text style={splitStyles.sectionSub}>쉼표로 여러 부위를 구분해요 (예: 등, 이두)</Text>
+            {labels.map((lbl, i) => (
+              <View key={i} style={splitStyles.slotRow}>
+                <View style={splitStyles.slotBadge}>
+                  <Text style={splitStyles.slotBadgeText}>Day {i + 1}</Text>
+                </View>
+                <TextInput
+                  style={splitStyles.slotInput}
+                  value={lbl}
+                  onChangeText={v => setLabels(prev => prev.map((x, j) => j === i ? v : x))}
+                  placeholder={SPLIT_PRESETS[splitCount]?.[i] ?? `운동 ${i + 1}`}
+                  placeholderTextColor="#48484a"
+                  returnKeyType="next"
+                />
+              </View>
+            ))}
+
+            {/* 현재 슬롯 위치 */}
+            {config && (
+              <View style={splitStyles.infoBox}>
+                <Text style={splitStyles.infoText}>
+                  현재 위치: Day {(config.currentSlotIndex % config.slots.length) + 1} — {config.slots[config.currentSlotIndex % config.slots.length]?.label}
+                </Text>
+                <Text style={[splitStyles.infoText, { color: '#636366', marginTop: 4 }]}>
+                  운동 기록할 때마다 자동으로 다음 날로 넘어가요
+                </Text>
+              </View>
+            )}
+          </>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const splitStyles = StyleSheet.create({
+  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 0.5, borderBottomColor: '#2c2c2e' },
+  title:        { color: '#fff', fontSize: 17, fontWeight: '700' },
+  back:         { color: '#4f8ef7', fontSize: 16, fontWeight: '500', width: 60 },
+  save:         { color: '#4f8ef7', fontSize: 16, fontWeight: '700', width: 60, textAlign: 'right' },
+  body:         { padding: 20, gap: 12, paddingBottom: 60 },
+  sectionLabel: { color: '#8e8e93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+  sectionSub:   { color: '#636366', fontSize: 12, marginBottom: 12, marginTop: -6 },
+  countRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  countBtn:     { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: '#1c1c1e', borderWidth: 1, borderColor: '#2c2c2e' },
+  countBtnOn:   { backgroundColor: 'rgba(79,142,247,0.15)', borderColor: '#4f8ef7' },
+  countBtnText: { color: '#8e8e93', fontSize: 14, fontWeight: '600' },
+  countBtnTextOn:{ color: '#4f8ef7' },
+  slotRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  slotBadge:    { width: 52, height: 32, borderRadius: 8, backgroundColor: '#1c1c1e', alignItems: 'center', justifyContent: 'center' },
+  slotBadgeText:{ color: '#8e8e93', fontSize: 12, fontWeight: '700' },
+  slotInput:    { flex: 1, backgroundColor: '#1c1c1e', color: '#fff', fontSize: 15, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#2c2c2e' },
+  infoBox:      { marginTop: 16, backgroundColor: 'rgba(79,142,247,0.08)', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: 'rgba(79,142,247,0.2)' },
+  infoText:     { color: '#4f8ef7', fontSize: 13, fontWeight: '600' },
 });
 
 // ── 날짜 상세 모달 ──────────────────────────────────
@@ -479,9 +627,11 @@ export default function ProfileScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showSchedulePanel, setShowSchedulePanel] = useState(false);
+  const [showSplitPanel, setShowSplitPanel]       = useState(false);
   const settingsAnim      = useRef(new Animated.Value(SCREEN_W)).current;
   const slideAnim         = useRef(new Animated.Value(SCREEN_W)).current;
   const scheduleSlideAnim = useRef(new Animated.Value(SCREEN_W)).current;
+  const splitSlideAnim    = useRef(new Animated.Value(SCREEN_W)).current;
 
   function openSettings() {
     setShowSettings(true);
@@ -519,6 +669,18 @@ export default function ProfileScreen() {
     });
   }
 
+  function openSplitPanel() {
+    setShowSplitPanel(true);
+    Animated.timing(splitSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+  }
+
+  function closeSplitPanel() {
+    Animated.timing(splitSlideAnim, { toValue: SCREEN_W, duration: 300, useNativeDriver: true }).start(() => {
+      setShowSplitPanel(false);
+      splitSlideAnim.setValue(SCREEN_W);
+    });
+  }
+
   const { data: profile, isLoading, refetch: refetchProfile } = useQuery({
     queryKey: ['profile', user?.id],
     queryFn:  () => api.get<Profile>(`/users/${user!.id}/profile`),
@@ -552,6 +714,12 @@ export default function ProfileScreen() {
   const myRankIdx   = rankingData?.ranking.findIndex(r => r.isMe) ?? -1;
   const myRank      = myRankIdx >= 0 ? myRankIdx + 1 : null;
   const rankTotal   = rankingData?.ranking.length ?? 0;
+
+  const { data: splitData, refetch: refetchSplit } = useQuery({
+    queryKey: ['split'],
+    queryFn:  () => api.get<SplitData>('/users/me/split'),
+    enabled:  !!user,
+  });
 
   async function toggleSocialFollow(targetId: string, currentlyFollowing: boolean) {
     if (currentlyFollowing) {
@@ -726,6 +894,18 @@ export default function ProfileScreen() {
                 </View>
                 <ChevronRightIcon />
               </TouchableOpacity>
+              <TouchableOpacity style={styles.settingsItem} onPress={openSplitPanel}>
+                <View style={styles.menuIconWrap}><DumbbellIcon size={20} color="#8e8e93" /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.settingsItemLabel}>운동 분할</Text>
+                  <Text style={styles.menuSub}>
+                    {splitData?.config
+                      ? `${splitData.config.slots.length}분할 · 다음: ${splitData.config.slots[splitData.todaySlotIndex ?? 0]?.label}`
+                      : '미설정'}
+                  </Text>
+                </View>
+                <ChevronRightIcon />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.settingsItem} onPress={openPrivacy}>
                 <View style={styles.menuIconWrap}><LockIcon size={20} color="#8e8e93" /></View>
                 <Text style={styles.settingsItemLabel}>개인정보 보호</Text>
@@ -815,6 +995,17 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               </View>
+            </Animated.View>
+          )}
+          {/* 운동 분할 */}
+          {showSplitPanel && (
+            <Animated.View style={[StyleSheet.absoluteFill, styles.modalWrap, { transform: [{ translateX: splitSlideAnim }] }]}>
+              <SplitPanel
+                insetTop={insets.top}
+                config={splitData?.config ?? null}
+                onClose={closeSplitPanel}
+                onSaved={() => { refetchSplit(); closeSplitPanel(); }}
+              />
             </Animated.View>
           )}
         </Animated.View>

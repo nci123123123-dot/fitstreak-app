@@ -200,6 +200,12 @@ export default function LogScreen() {
     queryFn:  () => api.get<{ user: GymInfo }>('/users/me'),
   });
 
+  const { data: splitData } = useQuery({
+    queryKey: ['split'],
+    queryFn:  () => api.get<{ todaySlot: { label: string } | null }>('/users/me/split'),
+    staleTime: 60_000,
+  });
+
   const streak = result?.streak ?? streakData?.streak;
   const gym    = gymData?.user;
   const gymSet = !!(gym?.gymLat && gym?.gymLng);
@@ -416,6 +422,12 @@ export default function LogScreen() {
             </Text>
             <Text style={styles.headerTitle}>운동 기록</Text>
           </View>
+          {splitData?.todaySlot && (
+            <View style={styles.splitBadge}>
+              <DumbbellIcon size={13} color="#4f8ef7" />
+              <Text style={styles.splitBadgeText}>{splitData.todaySlot.label}</Text>
+            </View>
+          )}
         </View>
 
         {/* ── 진행 단계 ── */}
@@ -547,9 +559,11 @@ const doneStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: C.bg },
 
-  header:      { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
+  header:      { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   headerSub:   { color: C.sub, fontSize: 12, fontWeight: '500', marginBottom: 2 },
   headerTitle: { color: C.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  splitBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(79,142,247,0.12)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(79,142,247,0.25)', marginBottom: 4 },
+  splitBadgeText: { color: '#4f8ef7', fontSize: 13, fontWeight: '700' },
 
   stepWrap: { paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: C.card },
 
