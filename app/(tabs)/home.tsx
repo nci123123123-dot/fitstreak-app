@@ -211,7 +211,7 @@ function EditModal({
 }
 
 // ── 오늘 내 상태 배너 ────────────────────────────────
-function TodayBanner({ streak, onLog }: { streak?: StreakData; onLog: () => void }) {
+function TodayBanner({ streak, todaySlot, onLog }: { streak?: StreakData; todaySlot?: string | null; onLog: () => void }) {
   if (!streak) return null;
 
   const todayKST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
@@ -226,7 +226,10 @@ function TodayBanner({ streak, onLog }: { streak?: StreakData; onLog: () => void
           </View>
           <View>
             <Text style={todayStyles.doneTitle}>오늘 완료</Text>
-            <Text style={todayStyles.doneSub}>{streak.currentStreak}일 연속 스트릭 중</Text>
+            <Text style={todayStyles.doneSub}>
+              {streak.currentStreak}일 연속 스트릭 중
+              {todaySlot ? ` · 다음: ${todaySlot}` : ''}
+            </Text>
           </View>
         </View>
         <View style={todayStyles.streakNum}>
@@ -248,9 +251,11 @@ function TodayBanner({ streak, onLog }: { streak?: StreakData; onLog: () => void
         </View>
         <View>
           <Text style={todayStyles.todoTitle}>
-            {streak.currentStreak > 0
-              ? `${streak.currentStreak}일 스트릭 위기`
-              : '오늘 운동을 기록해보세요'}
+            {todaySlot
+              ? todaySlot
+              : streak.currentStreak > 0
+                ? `${streak.currentStreak}일 스트릭 위기`
+                : '오늘 운동을 기록해보세요'}
           </Text>
           <Text style={todayStyles.todoSub}>
             {streak.currentStreak > 0
@@ -355,6 +360,12 @@ export default function HomeScreen() {
   const { data: streakData } = useQuery({
     queryKey: ['streak'],
     queryFn:  () => api.get<{ streak: StreakData }>('/workouts/streak'),
+  });
+
+  const { data: splitData } = useQuery({
+    queryKey: ['split'],
+    queryFn:  () => api.get<{ todaySlot: { label: string } | null }>('/users/me/split'),
+    staleTime: 60_000,
   });
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
@@ -555,6 +566,7 @@ export default function HomeScreen() {
             <View style={{ paddingTop: 12 }}>
               <TodayBanner
                 streak={streakData?.streak}
+                todaySlot={splitData?.todaySlot?.label ?? null}
                 onLog={() => router.push('/(tabs)/log')}
               />
               <FriendsNudge />

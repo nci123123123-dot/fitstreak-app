@@ -215,7 +215,9 @@ function SplitPanel({
   const [labels, setLabels]         = useState<string[]>(
     config?.slots.map(s => s.label) ?? []
   );
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
+  const currentIdx = config ? config.currentSlotIndex % config.slots.length : 0;
 
   function applyPreset(n: number) {
     setSplitCount(n);
@@ -300,17 +302,39 @@ function SplitPanel({
               </View>
             ))}
 
-            {/* 현재 슬롯 위치 */}
-            {config && (
-              <View style={splitStyles.infoBox}>
-                <Text style={splitStyles.infoText}>
-                  현재 위치: Day {(config.currentSlotIndex % config.slots.length) + 1} — {config.slots[config.currentSlotIndex % config.slots.length]?.label}
-                </Text>
-                <Text style={[splitStyles.infoText, { color: '#636366', marginTop: 4 }]}>
-                  운동 기록할 때마다 자동으로 다음 날로 넘어가요
-                </Text>
-              </View>
-            )}
+            {/* 현재 위치 + 수동 조정 */}
+            <Text style={[splitStyles.sectionLabel, { marginTop: 24 }]}>현재 위치</Text>
+            <Text style={splitStyles.sectionSub}>오늘 해야 할 Day를 수동으로 바꿀 수 있어요</Text>
+            <View style={splitStyles.slotPicker}>
+              {labels.map((lbl, i) => {
+                const isActive = i === (config ? currentIdx : 0);
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[splitStyles.slotPickerBtn, isActive && splitStyles.slotPickerBtnOn]}
+                    onPress={async () => {
+                      if (isActive || !config) return;
+                      setAdjusting(true);
+                      try {
+                        await api.patch('/users/me/split/slot', { slotIndex: i });
+                        onSaved();
+                      } catch (e: any) {
+                        Alert.alert('오류', e.message);
+                      } finally {
+                        setAdjusting(false);
+                      }
+                    }}
+                    disabled={adjusting}
+                  >
+                    <Text style={[splitStyles.slotPickerDay, isActive && splitStyles.slotPickerDayOn]}>Day {i + 1}</Text>
+                    <Text style={[splitStyles.slotPickerLabel, isActive && splitStyles.slotPickerLabelOn]} numberOfLines={1}>
+                      {lbl || '운동'}
+                    </Text>
+                    {isActive && <View style={splitStyles.slotPickerDot} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </>
         )}
       </ScrollView>
@@ -335,8 +359,14 @@ const splitStyles = StyleSheet.create({
   slotBadge:    { width: 52, height: 32, borderRadius: 8, backgroundColor: '#1c1c1e', alignItems: 'center', justifyContent: 'center' },
   slotBadgeText:{ color: '#8e8e93', fontSize: 12, fontWeight: '700' },
   slotInput:    { flex: 1, backgroundColor: '#1c1c1e', color: '#fff', fontSize: 15, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#2c2c2e' },
-  infoBox:      { marginTop: 16, backgroundColor: 'rgba(79,142,247,0.08)', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: 'rgba(79,142,247,0.2)' },
-  infoText:     { color: '#4f8ef7', fontSize: 13, fontWeight: '600' },
+  slotPicker:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  slotPickerBtn:      { flex: 1, minWidth: '30%', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, backgroundColor: '#1c1c1e', borderWidth: 1, borderColor: '#2c2c2e', alignItems: 'center', gap: 4 },
+  slotPickerBtnOn:    { backgroundColor: 'rgba(79,142,247,0.15)', borderColor: '#4f8ef7' },
+  slotPickerDay:      { color: '#636366', fontSize: 11, fontWeight: '700' },
+  slotPickerDayOn:    { color: '#4f8ef7' },
+  slotPickerLabel:    { color: '#8e8e93', fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  slotPickerLabelOn:  { color: '#fff' },
+  slotPickerDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4f8ef7', marginTop: 2 },
 });
 
 // ── 날짜 상세 모달 ──────────────────────────────────

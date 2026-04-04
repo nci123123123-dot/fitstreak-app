@@ -392,6 +392,12 @@ export default function LogScreen() {
               ? `내일도 운동하면 ${s.currentStreak + 1}일째가 돼요 🔥`
               : '오늘 하루도 잘 하셨어요!'}
           </Text>
+          {splitData?.todaySlot && (
+            <View style={doneStyles.nextSplit}>
+              <Text style={doneStyles.nextSplitLabel}>다음 운동</Text>
+              <Text style={doneStyles.nextSplitValue}>{splitData.todaySlot.label}</Text>
+            </View>
+          )}
           <View style={doneStyles.card}>
             <Text style={doneStyles.cardText}>내일 다시 기록할 수 있어요</Text>
           </View>
@@ -552,7 +558,10 @@ const doneStyles = StyleSheet.create({
   streak:       { color: '#fff', fontSize: 72, fontWeight: '900', letterSpacing: -3, lineHeight: 80 },
   streakLabel:  { color: '#8e8e93', fontSize: 16, fontWeight: '600', marginTop: -4 },
   sub:          { color: '#636366', fontSize: 15, textAlign: 'center', marginTop: 8, lineHeight: 22 },
-  card:         { marginTop: 24, backgroundColor: '#1c1c1e', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14 },
+  nextSplit:      { marginTop: 16, alignItems: 'center', backgroundColor: 'rgba(79,142,247,0.1)', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(79,142,247,0.25)' },
+  nextSplitLabel: { color: '#4f8ef7', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  nextSplitValue: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  card:         { marginTop: 16, backgroundColor: '#1c1c1e', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14 },
   cardText:     { color: '#636366', fontSize: 14 },
 });
 
