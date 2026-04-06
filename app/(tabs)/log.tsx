@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
+import { WebView } from 'react-native-webview';
 import { api } from '../../src/api/client';
 import WorkoutCamera, { CapturedPhotos } from '../../src/components/BeRealCamera';
 import ExerciseLogger, { ExerciseSet } from '../../src/components/ExerciseLogger';
@@ -49,6 +50,11 @@ function getDistanceM(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 const GYM_RADIUS_M = 300;
+const MAP_SERVER    = 'https://valiant-fascination-production-317c.up.railway.app';
+
+function buildMapUri(gymLat: number, gymLng: number, gymName: string): string {
+  return `${MAP_SERVER}/map?gymLat=${gymLat}&gymLng=${gymLng}&gymName=${encodeURIComponent(gymName)}&_t=${Date.now()}`;
+}
 
 interface StreakData {
   currentStreak: number;
@@ -187,6 +193,8 @@ export default function LogScreen() {
   const [gpsStatus, setGpsStatus]   = useState<GpsStatus>('idle');
   const [distanceM, setDistanceM]   = useState<number | null>(null);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
+  const webviewRef  = useRef<WebView>(null);
+  const mapReady    = useRef(false);
 
   const queryClient = useQueryClient();
 
@@ -238,14 +246,22 @@ export default function LogScreen() {
       locationSub.current?.remove();
 
       locationSub.current = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, distanceInterval: 10, timeInterval: 5000 },
+        { accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 3000 },
         (loc) => {
           const dist = getDistanceM(
             loc.coords.latitude, loc.coords.longitude,
             gym!.gymLat!, gym!.gymLng!,
           );
+          const ok = dist <= GYM_RADIUS_M;
           setDistanceM(Math.round(dist));
-          setGpsStatus(dist <= GYM_RADIUS_M ? 'verified' : 'far');
+          setGpsStatus(ok ? 'verified' : 'far');
+          if (mapReady.current) {
+            webviewRef.current?.postMessage(JSON.stringify({
+              lat: loc.coords.latitude,
+              lng: loc.coords.longitude,
+              ok,
+            }));
+          }
         },
       );
     } catch {
@@ -318,40 +334,50 @@ export default function LogScreen() {
       );
     }
 
-    if (gpsStatus === 'checking') {
-      return (
-        <View style={styles.gpsCard}>
-          <ActivityIndicator color={C.accent} style={{ marginRight: 14 }} />
-          <Text style={styles.gpsTitle}>위치 확인 중...</Text>
-        </View>
-      );
-    }
+    if (gpsStatus === 'checking' || gpsStatus === 'verified' || gpsStatus === 'far') {
+      const overlayColor = gpsStatus === 'verified' ? C.green : gpsStatus === 'far' ? C.red : C.accent;
+      const overlayIcon  = gpsStatus === 'verified'
+        ? <CheckCircleIcon size={14} color={overlayColor} strokeWidth={2.5} />
+        : gpsStatus === 'far'
+        ? <AlertCircleIcon size={14} color={overlayColor} strokeWidth={2.5} />
+        : null;
+      const overlayText  = gpsStatus === 'verified'
+        ? `인증 완료 · ${distanceM}m`
+        : gpsStatus === 'far'
+        ? `헬스장까지 ${distanceM}m (${GYM_RADIUS_M}m 이내 필요)`
+        : '위치 확인 중...';
 
-    if (gpsStatus === 'verified') {
+      const mapUri = gym?.gymLat && gym?.gymLng
+        ? buildMapUri(gym.gymLat, gym.gymLng, gym.gymName ?? '내 헬스장')
+        : null;
+
       return (
-        <View style={[styles.gpsCard, styles.gpsCardGreen]}>
-          <View style={[styles.gpsIconBg, styles.gpsIconGreen]}>
-            <CheckCircleIcon size={18} color={C.green} strokeWidth={2} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.gpsTitle, { color: C.green }]}>도착 인증 완료</Text>
-            <Text style={styles.gpsSub}>{gym?.gymName ?? '내 헬스장'}  {distanceM}m 이내</Text>
+        <View style={styles.gpsMapCard}>
+          {mapUri ? (
+            <WebView
+              ref={webviewRef}
+              style={styles.gpsMap}
+              source={{ uri: mapUri }}
+              originWhitelist={['*']}
+              javaScriptEnabled
+              domStorageEnabled
+              onLoadEnd={() => { mapReady.current = true; }}
+            />
+          ) : (
+            <View style={[styles.gpsMap, { alignItems: 'center', justifyContent: 'center', backgroundColor: C.card }]}>
+              <ActivityIndicator color={C.accent} />
+            </View>
+          )}
+
+          {/* 상태 오버레이 */}
+          <View style={styles.gpsMapOverlay}>
+            <View style={[styles.gpsMapBadge, { backgroundColor: overlayColor + '22', borderColor: overlayColor + '55' }]}>
+              {overlayIcon}
+              {gpsStatus === 'checking' && <ActivityIndicator size="small" color={overlayColor} style={{ marginRight: 4 }} />}
+              <Text style={[styles.gpsMapBadgeText, { color: overlayColor }]}>{overlayText}</Text>
+            </View>
           </View>
         </View>
-      );
-    }
-
-    if (gpsStatus === 'far') {
-      return (
-        <TouchableOpacity style={[styles.gpsCard, styles.gpsCardRed]} onPress={startWatchingGps} activeOpacity={0.8}>
-          <View style={[styles.gpsIconBg, styles.gpsIconRed]}>
-            <AlertCircleIcon size={18} color={C.red} strokeWidth={2} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.gpsTitle, { color: C.red }]}>헬스장과 멀어요</Text>
-            <Text style={styles.gpsSub}>{distanceM}m  {GYM_RADIUS_M}m 이내 필요  탭해서 재시도</Text>
-          </View>
-        </TouchableOpacity>
       );
     }
 
@@ -394,7 +420,7 @@ export default function LogScreen() {
           </Text>
           {splitData?.todaySlot && (
             <View style={doneStyles.nextSplit}>
-              <Text style={doneStyles.nextSplitLabel}>다음 운동</Text>
+              <Text style={doneStyles.nextSplitLabel}>오늘 운동</Text>
               <Text style={doneStyles.nextSplitValue}>{splitData.todaySlot.label}</Text>
             </View>
           )}
@@ -506,7 +532,11 @@ export default function LogScreen() {
                     <Text style={styles.optBadgeText}>사진 없으면 필수</Text>
                   </View>
                 </View>
-                <ExerciseLogger value={exercises} onChange={setExercises} />
+                <ExerciseLogger
+                  value={exercises}
+                  onChange={setExercises}
+                  suggestedLabel={splitData?.todaySlot?.label}
+                />
               </View>
 
               <View style={{ height: 20 }} />
@@ -579,6 +609,11 @@ const styles = StyleSheet.create({
   scroll: { padding: 20, gap: 14, paddingBottom: 40 },
 
   // GPS
+  gpsMapCard:         { borderRadius: 16, overflow: 'hidden', height: 300 },
+  gpsMap:             { flex: 1 },
+  gpsMapOverlay:      { position: 'absolute', top: 10, left: 10, right: 10, alignItems: 'flex-start', borderRadius: 10 },
+  gpsMapBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  gpsMapBadgeText:    { fontSize: 13, fontWeight: '700' },
   gpsCard:      { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 16, padding: 16 },
   gpsCardTap:   { borderWidth: 1.5, borderColor: C.accent },
   gpsCardGreen: { backgroundColor: 'rgba(48,209,88,0.07)', borderWidth: 1.5, borderColor: 'rgba(48,209,88,0.28)' },

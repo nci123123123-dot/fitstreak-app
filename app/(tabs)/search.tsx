@@ -64,12 +64,17 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* 헤더 */}
+      <View style={styles.headerBar}>
+        <Text style={styles.headerTitle}>친구 찾기</Text>
+      </View>
+
       {/* 검색 바 */}
       <View style={styles.searchBar}>
         <SearchIcon size={18} color="#636366" />
         <TextInput
           style={styles.input}
-          placeholder="이메일로 친구 찾기"
+          placeholder="이름 또는 이메일로 검색"
           placeholderTextColor="#636366"
           value={query}
           onChangeText={handleChange}
@@ -84,7 +89,7 @@ export default function SearchScreen() {
       {debouncedQ.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyText}>이메일을 입력해서{'\n'}친구를 찾아보세요</Text>
+          <Text style={styles.emptyText}>이름 또는 이메일로{'\n'}친구를 찾아보세요</Text>
         </View>
       ) : !isFetching && users.length === 0 ? (
         <View style={styles.empty}>
@@ -145,6 +150,9 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0a' },
+
+  headerBar:   { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  headerTitle: { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
 
   searchBar: {
     flexDirection: 'row',

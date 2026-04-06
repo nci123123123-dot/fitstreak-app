@@ -32,6 +32,17 @@ Notifications.setNotificationHandler({
 
 async function registerPushToken() {
   try {
+    // Android 알림 채널 설정
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'FitStreak',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#4f8ef7',
+        sound: 'default',
+      });
+    }
+
     const { status: existing } = await Notifications.getPermissionsAsync();
     let finalStatus = existing;
     if (existing !== 'granted') {
@@ -40,8 +51,10 @@ async function registerPushToken() {
     }
     if (finalStatus !== 'granted') return;
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
-    const platform  = Platform.OS === 'ios' ? 'ios' : 'android';
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: '6d945b9f-e4c8-447e-b5c3-e42535141e61',
+    });
+    const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     await api.post('/users/me/push-token', { token: tokenData.data, platform });
   } catch {
     // 알림 권한 거부 또는 등록 실패 — 무시
@@ -228,7 +241,7 @@ function TodayBanner({ streak, todaySlot, onLog }: { streak?: StreakData; todayS
             <Text style={todayStyles.doneTitle}>오늘 완료</Text>
             <Text style={todayStyles.doneSub}>
               {streak.currentStreak}일 연속 스트릭 중
-              {todaySlot ? ` · 다음: ${todaySlot}` : ''}
+              {todaySlot ? ` · 오늘: ${todaySlot}` : ''}
             </Text>
           </View>
         </View>
@@ -584,14 +597,21 @@ export default function HomeScreen() {
               <View style={styles.emptyIconWrap}>
                 <DumbbellIcon size={40} color={C.secondary} strokeWidth={1.4} />
               </View>
-              <Text style={styles.emptyTitle}>피드에 아무도 없어요</Text>
-              <Text style={styles.emptySub}>운동을 준비해봐요</Text>
+              <Text style={styles.emptyTitle}>아직 피드가 비었어요</Text>
+              <Text style={styles.emptySub}>친구를 추가하거나{'\n'}오늘 운동을 기록해봐요</Text>
               <TouchableOpacity
                 style={styles.emptyBtn}
                 onPress={() => router.push('/(tabs)/log')}
                 activeOpacity={0.8}
               >
                 <Text style={styles.emptyBtnText}>오늘 운동 기록하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.emptyBtnSecondary}
+                onPress={() => router.push('/(tabs)/search')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.emptyBtnSecondaryText}>친구 찾기</Text>
               </TouchableOpacity>
             </View>
           }
@@ -927,6 +947,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 15,
     letterSpacing: -0.2,
+  },
+  emptyBtnSecondary: {
+    marginTop: 8,
+    backgroundColor: 'transparent',
+    borderRadius: 14,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#2c2c2e',
+  },
+  emptyBtnSecondaryText: {
+    color: '#8e8e93',
+    fontWeight: '600',
+    fontSize: 15,
   },
 });
 
