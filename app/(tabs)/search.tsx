@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../src/api/client';
 import { SearchIcon } from '../../src/components/Icons';
+import FriendProfileModal from '../../src/components/FriendProfileModal';
 
 interface SearchUser {
   id: string;
@@ -20,6 +21,7 @@ export default function SearchScreen() {
   const [query, setQuery]         = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
 
@@ -105,25 +107,26 @@ export default function SearchScreen() {
             const pending = pendingIds.has(item.id);
             return (
               <View style={styles.userRow}>
-                {/* 아바타 */}
-                {item.profilePhoto ? (
-                  <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarLetter}>{item.displayName[0]}</Text>
-                  </View>
-                )}
+                {/* 아바타 + 이름 영역: 탭하면 프로필 모달 */}
+                <TouchableOpacity style={styles.userInfo} onPress={() => setSelectedUserId(item.id)} activeOpacity={0.7}>
+                  {item.profilePhoto ? (
+                    <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatarFallback}>
+                      <Text style={styles.avatarLetter}>{item.displayName[0]}</Text>
+                    </View>
+                  )}
 
-                {/* 이름 + 팔로워 뱃지 */}
-                <View style={styles.nameCol}>
-                  <Text style={styles.displayName}>{item.displayName}</Text>
-                  {item.isFollower && !item.isFollowing && (
-                    <Text style={styles.followerBadge}>나를 팔로우해요</Text>
-                  )}
-                  {item.isFollower && item.isFollowing && (
-                    <Text style={styles.mutualBadge}>서로 팔로우</Text>
-                  )}
-                </View>
+                  <View style={styles.nameCol}>
+                    <Text style={styles.displayName}>{item.displayName}</Text>
+                    {item.isFollower && !item.isFollowing && (
+                      <Text style={styles.followerBadge}>나를 팔로우해요</Text>
+                    )}
+                    {item.isFollower && item.isFollowing && (
+                      <Text style={styles.mutualBadge}>서로 팔로우</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
 
                 {/* 팔로우/팔로잉 버튼 */}
                 <TouchableOpacity
@@ -143,6 +146,9 @@ export default function SearchScreen() {
             );
           }}
         />
+      )}
+      {selectedUserId && (
+        <FriendProfileModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
       )}
     </SafeAreaView>
   );
@@ -178,6 +184,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#1c1c1e',
   },
+  userInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar:        { width: 48, height: 48, borderRadius: 24 },
   avatarFallback:{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#1c3a6e', alignItems: 'center', justifyContent: 'center' },
   avatarLetter:  { color: '#fff', fontSize: 20, fontWeight: '700' },

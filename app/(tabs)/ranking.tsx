@@ -5,9 +5,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect, router } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { api } from '../../src/api/client';
 import { FlameIcon } from '../../src/components/Icons';
+import FriendProfileModal from '../../src/components/FriendProfileModal';
 
 interface RankEntry {
   id: string;
@@ -23,6 +24,8 @@ interface RankEntry {
 const MEDAL = ['🥇', '🥈', '🥉'];
 
 export default function RankingScreen() {
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['friendsRanking'],
     queryFn:  () => api.get<{ ranking: RankEntry[] }>('/users/me/friends/ranking'),
@@ -62,19 +65,23 @@ export default function RankingScreen() {
           }
           contentContainerStyle={{ paddingBottom: 32 }}
           ListHeaderComponent={
-            ranking.length >= 3 ? <Podium top3={ranking.slice(0, 3)} /> : null
+            ranking.length >= 3 ? <Podium top3={ranking.slice(0, 3)} onSelect={setSelectedUserId} /> : null
           }
           renderItem={({ item, index }) => (
-            <RankRow entry={item} rank={index + 1} />
+            <RankRow entry={item} rank={index + 1} onPress={item.isMe ? undefined : () => setSelectedUserId(item.id)} />
           )}
         />
+      )}
+
+      {selectedUserId && (
+        <FriendProfileModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
       )}
     </SafeAreaView>
   );
 }
 
 // ── 시상대 (상위 3명) ────────────────────────────────
-function Podium({ top3 }: { top3: RankEntry[] }) {
+function Podium({ top3, onSelect }: { top3: RankEntry[]; onSelect: (id: string) => void }) {
   const order = [top3[1], top3[0], top3[2]].filter(Boolean); // 2nd, 1st, 3rd 순서
   const heights = [70, 90, 55];
   const ranks = [2, 1, 3];
@@ -82,7 +89,7 @@ function Podium({ top3 }: { top3: RankEntry[] }) {
   return (
     <View style={podiumStyles.wrap}>
       {order.map((entry, i) => (
-        <View key={entry.id} style={podiumStyles.col}>
+        <TouchableOpacity key={entry.id} style={podiumStyles.col} onPress={entry.isMe ? undefined : () => onSelect(entry.id)} activeOpacity={entry.isMe ? 1 : 0.7}>
           {/* 아바타 */}
           <View style={[podiumStyles.avatarRing, ranks[i] === 1 && podiumStyles.avatarRingGold]}>
             {entry.profilePhoto ? (
@@ -108,16 +115,16 @@ function Podium({ top3 }: { top3: RankEntry[] }) {
           <View style={[podiumStyles.block, { height: heights[i] }]}>
             <Text style={podiumStyles.blockRank}>{ranks[i]}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );
 }
 
 // ── 랭킹 행 (4위 이하) ──────────────────────────────
-function RankRow({ entry, rank }: { entry: RankEntry; rank: number }) {
+function RankRow({ entry, rank, onPress }: { entry: RankEntry; rank: number; onPress?: () => void }) {
   return (
-    <View style={[rowStyles.row, entry.isMe && rowStyles.rowMe]}>
+    <TouchableOpacity style={[rowStyles.row, entry.isMe && rowStyles.rowMe]} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
       <Text style={rowStyles.rank}>{rank}</Text>
 
       {entry.profilePhoto ? (
@@ -154,7 +161,7 @@ function RankRow({ entry, rank }: { entry: RankEntry; rank: number }) {
           <Text style={rowStyles.streakUnit}>일</Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
