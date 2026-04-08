@@ -23,33 +23,53 @@ interface RankEntry {
   profilePhoto: string | null;
   currentStreak: number;
   longestStreak: number;
+  totalWorkouts: number;
   workedOutToday: boolean;
   isMe: boolean;
   todaySlotLabel: string | null;
 }
 
+type SortMode = 'streak' | 'volume';
+
 const MEDAL = ['🥇', '🥈', '🥉'];
 
 export default function RankingScreen() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortMode>('streak');
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['friendsRanking'],
-    queryFn:  () => api.get<{ ranking: RankEntry[] }>('/users/me/friends/ranking'),
+    queryKey: ['friendsRanking', sort],
+    queryFn:  () => api.get<{ ranking: RankEntry[] }>(`/users/me/friends/ranking?sort=${sort}`),
   });
 
-  // 탭 포커스마다 최신 데이터 갱신
   useFocusEffect(
-    useCallback(() => { refetch(); }, [])
+    useCallback(() => { refetch(); }, [sort])
   );
 
   const ranking = data?.ranking ?? [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* 헤더 */}
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>친구 랭킹</Text>
-        <Text style={styles.headerSub}>스트릭 기준</Text>
+        {/* 정렬 토글 */}
+        <View style={styles.sortToggle}>
+          <TouchableOpacity
+            style={[styles.sortBtn, sort === 'streak' && styles.sortBtnActive]}
+            onPress={() => setSort('streak')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.sortBtnText, sort === 'streak' && styles.sortBtnTextActive]}>🔥 스트릭</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sortBtn, sort === 'volume' && styles.sortBtnActive]}
+            onPress={() => setSort('volume')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.sortBtnText, sort === 'volume' && styles.sortBtnTextActive]}>💪 볼륨</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {isLoading ? (
@@ -72,10 +92,17 @@ export default function RankingScreen() {
           }
           contentContainerStyle={{ paddingBottom: 32 }}
           ListHeaderComponent={
-            ranking.length >= 3 ? <Podium top3={ranking.slice(0, 3)} onSelect={setSelectedUserId} /> : null
+            ranking.length >= 3
+              ? <Podium top3={ranking.slice(0, 3)} onSelect={setSelectedUserId} sort={sort} />
+              : null
           }
           renderItem={({ item, index }) => (
-            <RankRow entry={item} rank={index + 1} onPress={item.isMe ? undefined : () => setSelectedUserId(item.id)} />
+            <RankRow
+              entry={item}
+              rank={index + 1}
+              sort={sort}
+              onPress={item.isMe ? undefined : () => setSelectedUserId(item.id)}
+            />
           )}
         />
       )}
@@ -88,8 +115,8 @@ export default function RankingScreen() {
 }
 
 // ── 시상대 (상위 3명) ────────────────────────────────
-function Podium({ top3, onSelect }: { top3: RankEntry[]; onSelect: (id: string) => void }) {
-  const order = [top3[1], top3[0], top3[2]].filter(Boolean); // 2nd, 1st, 3rd 순서
+function Podium({ top3, onSelect, sort }: { top3: RankEntry[]; onSelect: (id: string) => void; sort: SortMode }) {
+  const order = [top3[1], top3[0], top3[2]].filter(Boolean);
   const heights = [70, 90, 55];
   const ranks = [2, 1, 3];
 
@@ -97,7 +124,6 @@ function Podium({ top3, onSelect }: { top3: RankEntry[]; onSelect: (id: string) 
     <View style={podiumStyles.wrap}>
       {order.map((entry, i) => (
         <TouchableOpacity key={entry.id} style={podiumStyles.col} onPress={entry.isMe ? undefined : () => onSelect(entry.id)} activeOpacity={entry.isMe ? 1 : 0.7}>
-          {/* 아바타 */}
           <View style={[podiumStyles.avatarRing, ranks[i] === 1 && podiumStyles.avatarRingGold]}>
             {entry.profilePhoto ? (
               <Image source={{ uri: entry.profilePhoto }} style={podiumStyles.avatar} />
@@ -112,13 +138,17 @@ function Podium({ top3, onSelect }: { top3: RankEntry[]; onSelect: (id: string) 
             {entry.isMe ? '나' : entry.displayName}
           </Text>
 
-          {/* 스트릭 */}
-          <View style={podiumStyles.streakBadge}>
-            <FlameIcon size={13} color="#f7a84f" />
-            <Text style={podiumStyles.streakText}>{entry.currentStreak}일</Text>
-          </View>
+          {sort === 'streak' ? (
+            <View style={podiumStyles.streakBadge}>
+              <FlameIcon size={13} color="#f7a84f" />
+              <Text style={podiumStyles.streakText}>{entry.currentStreak}일</Text>
+            </View>
+          ) : (
+            <View style={[podiumStyles.streakBadge, podiumStyles.volumeBadge]}>
+              <Text style={podiumStyles.volumeText}>{entry.totalWorkouts}회</Text>
+            </View>
+          )}
 
-          {/* 시상대 블록 */}
           <View style={[podiumStyles.block, { height: heights[i] }]}>
             <Text style={podiumStyles.blockRank}>{ranks[i]}</Text>
           </View>
@@ -129,7 +159,7 @@ function Podium({ top3, onSelect }: { top3: RankEntry[]; onSelect: (id: string) 
 }
 
 // ── 랭킹 행 (4위 이하) ──────────────────────────────
-function RankRow({ entry, rank, onPress }: { entry: RankEntry; rank: number; onPress?: () => void }) {
+function RankRow({ entry, rank, onPress, sort }: { entry: RankEntry; rank: number; onPress?: () => void; sort: SortMode }) {
   return (
     <TouchableOpacity style={[rowStyles.row, entry.isMe && rowStyles.rowMe]} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
       <Text style={rowStyles.rank}>{rank}</Text>
@@ -147,7 +177,11 @@ function RankRow({ entry, rank, onPress }: { entry: RankEntry; rank: number; onP
           {entry.isMe ? `나 (${entry.displayName})` : entry.displayName}
         </Text>
         <View style={rowStyles.subRow}>
-          <Text style={rowStyles.longest}>최장 {entry.longestStreak}일</Text>
+          {sort === 'streak' ? (
+            <Text style={rowStyles.longest}>최장 {entry.longestStreak}일</Text>
+          ) : (
+            <Text style={rowStyles.longest}>스트릭 {entry.currentStreak}일</Text>
+          )}
           {entry.todaySlotLabel && (
             <View style={rowStyles.splitBadge}>
               <Text style={rowStyles.splitBadgeText}>{entry.todaySlotLabel}</Text>
@@ -162,11 +196,18 @@ function RankRow({ entry, rank, onPress }: { entry: RankEntry; rank: number; onP
             <Text style={rowStyles.todayText}>오늘 완료</Text>
           </View>
         )}
-        <View style={rowStyles.streakBadge}>
-          <FlameIcon size={14} color="#f7a84f" />
-          <Text style={rowStyles.streakNum}>{entry.currentStreak}</Text>
-          <Text style={rowStyles.streakUnit}>일</Text>
-        </View>
+        {sort === 'streak' ? (
+          <View style={rowStyles.streakBadge}>
+            <FlameIcon size={14} color="#f7a84f" />
+            <Text style={rowStyles.streakNum}>{entry.currentStreak}</Text>
+            <Text style={rowStyles.streakUnit}>일</Text>
+          </View>
+        ) : (
+          <View style={rowStyles.streakBadge}>
+            <Text style={rowStyles.streakNum}>{entry.totalWorkouts}</Text>
+            <Text style={rowStyles.streakUnit}>회</Text>
+          </View>
+        )}
         {!entry.isMe && <ChevronRightIcon size={16} color="#3a3a3c" strokeWidth={2} />}
       </View>
     </TouchableOpacity>
@@ -175,9 +216,16 @@ function RankRow({ entry, rank, onPress }: { entry: RankEntry; rank: number; onP
 
 const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: '#0a0a0a' },
-  headerBar:   { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
+  headerBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
   headerTitle: { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  headerSub:   { color: '#636366', fontSize: 13 },
+
+  // 정렬 토글
+  sortToggle:      { flexDirection: 'row', backgroundColor: '#1c1c1e', borderRadius: 12, padding: 3, gap: 2 },
+  sortBtn:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9 },
+  sortBtnActive:   { backgroundColor: '#2c2c2e' },
+  sortBtnText:     { color: '#636366', fontSize: 12, fontWeight: '600' },
+  sortBtnTextActive:{ color: '#fff' },
+
   empty:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingBottom: 80 },
   emptyIcon:   { fontSize: 48 },
   emptyTitle:  { color: '#fff', fontSize: 18, fontWeight: '700' },
@@ -200,6 +248,8 @@ const podiumStyles = StyleSheet.create({
   nameMe:        { color: '#4f8ef7' },
   streakBadge:   { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(247,168,79,0.12)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   streakText:    { color: '#f7a84f', fontSize: 12, fontWeight: '700' },
+  volumeBadge:   { backgroundColor: 'rgba(48,209,88,0.12)' },
+  volumeText:    { color: '#30d158', fontSize: 12, fontWeight: '700' },
   block:         { width: '100%', backgroundColor: '#1c1c1e', borderTopLeftRadius: 8, borderTopRightRadius: 8, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 8 },
   blockRank:     { color: '#3a3a3c', fontSize: 16, fontWeight: '800' },
 });
