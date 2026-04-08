@@ -49,6 +49,12 @@ interface GymInfo { gymName: string | null; gymLat: number | null; gymLng: numbe
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const MON_FIRST_ORDER = [1, 2, 3, 4, 5, 6, 0]; // 월~일 순서
+const AVATAR_COLORS = ['#4f8ef7', '#f7a84f', '#30d158', '#bf5af2', '#ff6b6b', '#0dd3c5'];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
 function sortMonFirst(days: number[]) {
   return [...days].sort((a, b) => MON_FIRST_ORDER.indexOf(a) - MON_FIRST_ORDER.indexOf(b));
 }
@@ -475,7 +481,7 @@ function SocialModal({
               return (
                 <View style={styles.userRow}>
                   <TouchableOpacity style={styles.userInfo} onPress={() => setProfileUserId(item.id)} activeOpacity={0.7}>
-                    <View style={styles.userAvatar}>
+                    <View style={[styles.userAvatar, { backgroundColor: avatarColor(item.displayName) }]}>
                       <Text style={styles.userAvatarText}>{item.displayName[0]}</Text>
                     </View>
                     <Text style={styles.userDisplayName}>{item.displayName}</Text>
@@ -1071,7 +1077,7 @@ export default function ProfileScreen() {
             {gymData?.user?.profilePhoto ? (
               <Image source={{ uri: gymData.user.profilePhoto }} style={styles.avatarImg} />
             ) : (
-              <View style={styles.avatar}>
+              <View style={[styles.avatar, { backgroundColor: avatarColor(user?.displayName ?? '?') }]}>
                 <Text style={styles.avatarText}>{user?.displayName?.[0] ?? '?'}</Text>
               </View>
             )}
@@ -1198,6 +1204,22 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
+        {/* ── 헬스장 미등록 온보딩 배너 ── */}
+        {!gymData?.user?.gymLat && (
+          <TouchableOpacity
+            style={styles.gymNoBanner}
+            onPress={() => setShowGymPicker(true)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.gymNoBannerEmoji}>📍</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.gymNoBannerTitle}>헬스장을 등록해야 운동을 기록할 수 있어요</Text>
+              <Text style={styles.gymNoBannerSub}>탭해서 내 헬스장 위치를 등록하세요</Text>
+            </View>
+            <ChevronRightIcon size={18} color="#f7a84f" strokeWidth={2} />
+          </TouchableOpacity>
+        )}
+
         {/* ── 머슬 커버리지 맵 ── */}
         <MuscleCoverageMap onOpenHistory={() => setShowHistory(true)} />
 
@@ -1240,7 +1262,7 @@ const styles = StyleSheet.create({
   settingsBtn:   { position: 'absolute', top: 20, right: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: '#1c1c1e', alignItems: 'center', justifyContent: 'center' },
   settingsIcon:  { fontSize: 17 },
   avatarRing:    { width: 92, height: 92, borderRadius: 46, borderWidth: 2.5, borderColor: '#4f8ef7', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  avatar:        { width: 82, height: 82, borderRadius: 41, backgroundColor: '#1c3a6e', alignItems: 'center', justifyContent: 'center' },
+  avatar:        { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center' },
   avatarText:    { color: '#fff', fontSize: 34, fontWeight: '800' },
   name:          { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
   email:         { color: '#8e8e93', fontSize: 13, marginTop: 4 },
@@ -1287,6 +1309,12 @@ const styles = StyleSheet.create({
   debtFill:            { height: '100%', borderRadius: 3 },
   debtCount:           { color: '#636366', fontSize: 12, textAlign: 'right' },
 
+  // ── 헬스장 미등록 배너
+  gymNoBanner:        { marginHorizontal: 16, marginBottom: 12, backgroundColor: 'rgba(247,168,79,0.08)', borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: 'rgba(247,168,79,0.3)' },
+  gymNoBannerEmoji:   { fontSize: 26 },
+  gymNoBannerTitle:   { color: '#f7a84f', fontSize: 14, fontWeight: '700' },
+  gymNoBannerSub:     { color: '#9a7540', fontSize: 12, marginTop: 3 },
+
   // ── 메뉴 카드
   menuCard:      { marginHorizontal: 16, backgroundColor: '#1c1c1e', borderRadius: 18, overflow: 'hidden', marginBottom: 12 },
   menuItem:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 16, gap: 14 },
@@ -1308,7 +1336,7 @@ const styles = StyleSheet.create({
   // ── 소셜 목록
   userRow:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 0.5, borderBottomColor: '#2c2c2e' },
   userInfo:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  userAvatar:      { width: 46, height: 46, borderRadius: 23, backgroundColor: '#1c3a6e', alignItems: 'center', justifyContent: 'center' },
+  userAvatar:      { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   userAvatarText:  { color: '#fff', fontWeight: '700', fontSize: 18 },
   userDisplayName: { color: '#fff', fontSize: 16, fontWeight: '600' },
   emptyList:       { color: '#636366', textAlign: 'center', marginTop: 60, fontSize: 15 },

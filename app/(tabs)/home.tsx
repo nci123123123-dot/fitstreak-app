@@ -431,10 +431,10 @@ export default function HomeScreen() {
             {isOwn && (
               <TouchableOpacity
                 onPress={() => setEditingLog(item)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 style={styles.moreBtn}
               >
-                <Text style={styles.moreBtnText}>···</Text>
+                <PencilIcon size={16} color={C.secondary} strokeWidth={1.8} />
               </TouchableOpacity>
             )}
           </View>
@@ -517,8 +517,8 @@ export default function HomeScreen() {
         <View style={styles.reactionRow}>
           {([
             { type: 'like',   Icon: ThumbUpIcon,  label: '좋아요', activeColor: '#4f8ef7' },
-            { type: 'fire',   Icon: FlameIcon,    label: '불꽃',   activeColor: '#f7a84f' },
-            { type: 'strong', Icon: DumbbellIcon, label: '대단해', activeColor: '#30d158' },
+            { type: 'fire',   Icon: FlameIcon,    label: '🔥',     activeColor: '#f7a84f' },
+            { type: 'strong', Icon: DumbbellIcon, label: '💪',     activeColor: '#30d158' },
           ] as const).map(({ type, Icon, label, activeColor }) => {
             const count = reactionCounts[type] ?? 0;
             const hasReacted = item.reactions.some(
@@ -527,7 +527,7 @@ export default function HomeScreen() {
             return (
               <TouchableOpacity
                 key={type}
-                style={[styles.reactionBtn, hasReacted && styles.reactionBtnActive]}
+                style={[styles.reactionBtn, hasReacted && { ...styles.reactionBtnActive, borderColor: activeColor + '44' }]}
                 onPress={() => reactMutation.mutate({ logId: item.id, type })}
                 activeOpacity={0.7}
               >
@@ -759,15 +759,12 @@ const styles = StyleSheet.create({
 
   // 편집 버튼
   moreBtn: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  moreBtnText: {
-    color: C.secondary,
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: 1,
-    lineHeight: 22,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(142,142,147,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // 사진 (4:3)

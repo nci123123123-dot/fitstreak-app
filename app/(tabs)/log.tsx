@@ -5,7 +5,7 @@ import {
   Dimensions, Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
@@ -49,7 +49,7 @@ function getDistanceM(lat1: number, lng1: number, lat2: number, lng2: number) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const GYM_RADIUS_M = 300;
+const GYM_RADIUS_M = 10;
 const MAP_SERVER    = 'https://valiant-fascination-production-317c.up.railway.app';
 
 function buildMapUri(gymLat: number, gymLng: number, gymName: string): string {
@@ -195,6 +195,7 @@ export default function LogScreen() {
   const locationSub = useRef<Location.LocationSubscription | null>(null);
   const webviewRef  = useRef<WebView>(null);
   const mapReady    = useRef(false);
+  const lastLocMsg  = useRef<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -255,12 +256,10 @@ export default function LogScreen() {
           const ok = dist <= GYM_RADIUS_M;
           setDistanceM(Math.round(dist));
           setGpsStatus(ok ? 'verified' : 'far');
+          const msg = JSON.stringify({ lat: loc.coords.latitude, lng: loc.coords.longitude, ok });
+          lastLocMsg.current = msg;
           if (mapReady.current) {
-            webviewRef.current?.postMessage(JSON.stringify({
-              lat: loc.coords.latitude,
-              lng: loc.coords.longitude,
-              ok,
-            }));
+            webviewRef.current?.postMessage(msg);
           }
         },
       );
@@ -307,15 +306,20 @@ export default function LogScreen() {
 
     if (!gymSet) {
       return (
-        <View style={styles.gpsCard}>
-          <View style={[styles.gpsIconBg, styles.gpsIconGray]}>
-            <LocationIcon size={18} color={C.sub} />
+        <TouchableOpacity
+          style={[styles.gpsCard, styles.gpsCardNoGym]}
+          onPress={() => router.push('/(tabs)/profile')}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.gpsIconBg, { backgroundColor: 'rgba(247,168,79,0.15)' }]}>
+            <LocationIcon size={18} color={C.orange} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.gpsTitle}>헬스장 미등록</Text>
-            <Text style={styles.gpsSub}>프로필 탭에서 등록해주세요</Text>
+            <Text style={[styles.gpsTitle, { color: C.orange }]}>헬스장을 먼저 등록해주세요</Text>
+            <Text style={styles.gpsSub}>프로필 → 헬스장 위치에서 설정할 수 있어요</Text>
           </View>
-        </View>
+          <ChevronRightIcon size={18} color={C.orange} strokeWidth={2} />
+        </TouchableOpacity>
       );
     }
 
@@ -361,7 +365,12 @@ export default function LogScreen() {
               originWhitelist={['*']}
               javaScriptEnabled
               domStorageEnabled
-              onLoadEnd={() => { mapReady.current = true; }}
+              onLoadEnd={() => {
+                mapReady.current = true;
+                if (lastLocMsg.current) {
+                  webviewRef.current?.postMessage(lastLocMsg.current);
+                }
+              }}
             />
           ) : (
             <View style={[styles.gpsMap, { alignItems: 'center', justifyContent: 'center', backgroundColor: C.card }]}>
@@ -424,9 +433,14 @@ export default function LogScreen() {
               <Text style={doneStyles.nextSplitValue}>{splitData.todaySlot.label}</Text>
             </View>
           )}
-          <View style={doneStyles.card}>
-            <Text style={doneStyles.cardText}>내일 다시 기록할 수 있어요</Text>
-          </View>
+          <TouchableOpacity
+            style={doneStyles.feedBtn}
+            onPress={() => router.push('/(tabs)/home')}
+            activeOpacity={0.85}
+          >
+            <Text style={doneStyles.feedBtnText}>친구 피드 보기</Text>
+          </TouchableOpacity>
+          <Text style={doneStyles.tomorrowHint}>내일 다시 기록할 수 있어요</Text>
         </View>
       </SafeAreaView>
     );
@@ -582,17 +596,18 @@ export default function LogScreen() {
 }
 
 const doneStyles = StyleSheet.create({
-  wrap:         { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },
-  iconRing:     { width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(48,209,88,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 2, borderColor: 'rgba(48,209,88,0.25)' },
-  title:        { color: '#30d158', fontSize: 32, fontWeight: '900', letterSpacing: -0.5 },
-  streak:       { color: '#fff', fontSize: 72, fontWeight: '900', letterSpacing: -3, lineHeight: 80 },
-  streakLabel:  { color: '#8e8e93', fontSize: 16, fontWeight: '600', marginTop: -4 },
-  sub:          { color: '#636366', fontSize: 15, textAlign: 'center', marginTop: 8, lineHeight: 22 },
+  wrap:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },
+  iconRing:       { width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(48,209,88,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 2, borderColor: 'rgba(48,209,88,0.25)' },
+  title:          { color: '#30d158', fontSize: 32, fontWeight: '900', letterSpacing: -0.5 },
+  streak:         { color: '#fff', fontSize: 72, fontWeight: '900', letterSpacing: -3, lineHeight: 80 },
+  streakLabel:    { color: '#8e8e93', fontSize: 16, fontWeight: '600', marginTop: -4 },
+  sub:            { color: '#636366', fontSize: 15, textAlign: 'center', marginTop: 8, lineHeight: 22 },
   nextSplit:      { marginTop: 16, alignItems: 'center', backgroundColor: 'rgba(79,142,247,0.1)', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(79,142,247,0.25)' },
   nextSplitLabel: { color: '#4f8ef7', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
   nextSplitValue: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  card:         { marginTop: 16, backgroundColor: '#1c1c1e', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14 },
-  cardText:     { color: '#636366', fontSize: 14 },
+  feedBtn:        { marginTop: 24, backgroundColor: '#4f8ef7', borderRadius: 16, paddingHorizontal: 36, paddingVertical: 16, shadowColor: '#4f8ef7', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  feedBtnText:    { color: '#fff', fontWeight: '700', fontSize: 16 },
+  tomorrowHint:   { color: '#3a3a3c', fontSize: 13, marginTop: 12 },
 });
 
 const styles = StyleSheet.create({
@@ -616,6 +631,7 @@ const styles = StyleSheet.create({
   gpsMapBadgeText:    { fontSize: 13, fontWeight: '700' },
   gpsCard:      { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 16, padding: 16 },
   gpsCardTap:   { borderWidth: 1.5, borderColor: C.accent },
+  gpsCardNoGym: { borderWidth: 1.5, borderColor: 'rgba(247,168,79,0.4)', backgroundColor: 'rgba(247,168,79,0.06)' },
   gpsCardGreen: { backgroundColor: 'rgba(48,209,88,0.07)', borderWidth: 1.5, borderColor: 'rgba(48,209,88,0.28)' },
   gpsCardRed:   { backgroundColor: 'rgba(255,69,58,0.07)', borderWidth: 1.5, borderColor: 'rgba(255,69,58,0.28)' },
   gpsIconBg:    { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },

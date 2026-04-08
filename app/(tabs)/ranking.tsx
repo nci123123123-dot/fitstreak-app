@@ -10,6 +10,13 @@ import { api } from '../../src/api/client';
 import { FlameIcon, ChevronRightIcon } from '../../src/components/Icons';
 import FriendProfileModal from '../../src/components/FriendProfileModal';
 
+const AVATAR_COLORS = ['#4f8ef7', '#f7a84f', '#30d158', '#bf5af2', '#ff6b6b', '#0dd3c5'];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
 interface RankEntry {
   id: string;
   displayName: string;
@@ -95,7 +102,7 @@ function Podium({ top3, onSelect }: { top3: RankEntry[]; onSelect: (id: string) 
             {entry.profilePhoto ? (
               <Image source={{ uri: entry.profilePhoto }} style={podiumStyles.avatar} />
             ) : (
-              <View style={[podiumStyles.avatarFallback, entry.isMe && podiumStyles.avatarMe]}>
+              <View style={[podiumStyles.avatarFallback, { backgroundColor: entry.isMe ? '#2a3a6e' : avatarColor(entry.displayName) }]}>
                 <Text style={podiumStyles.avatarLetter}>{entry.displayName[0]}</Text>
               </View>
             )}
@@ -130,7 +137,7 @@ function RankRow({ entry, rank, onPress }: { entry: RankEntry; rank: number; onP
       {entry.profilePhoto ? (
         <Image source={{ uri: entry.profilePhoto }} style={rowStyles.avatar} />
       ) : (
-        <View style={[rowStyles.avatarFallback, entry.isMe && rowStyles.avatarMe]}>
+        <View style={[rowStyles.avatarFallback, { backgroundColor: entry.isMe ? '#2a3a6e' : avatarColor(entry.displayName) }]}>
           <Text style={rowStyles.avatarLetter}>{entry.displayName[0]}</Text>
         </View>
       )}
