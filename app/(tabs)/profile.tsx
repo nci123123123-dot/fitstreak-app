@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Alert, ActivityIndicator, Modal, Image, FlatList, Dimensions, Animated, TextInput,
@@ -11,6 +11,7 @@ import { useAuthStore } from '../../src/store/auth.store';
 import { api } from '../../src/api/client';
 import GymPicker, { GymLocation } from '../../src/components/GymPicker';
 import MuscleCoverageMap from '../../src/components/MuscleCoverageMap';
+import FriendProfileModal from '../../src/components/FriendProfileModal';
 import {
   SettingsIcon, CalendarIcon, LocationIcon,
   LockIcon, LogoutIcon, ChevronRightIcon,
@@ -47,6 +48,10 @@ interface SplitData   { config: SplitConfig | null; todaySlot: SplitSlot | null;
 interface GymInfo { gymName: string | null; gymLat: number | null; gymLng: number | null; defaultVisibility: string; profilePhoto?: string | null; }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const MON_FIRST_ORDER = [1, 2, 3, 4, 5, 6, 0]; // 월~일 순서
+function sortMonFirst(days: number[]) {
+  return [...days].sort((a, b) => MON_FIRST_ORDER.indexOf(a) - MON_FIRST_ORDER.indexOf(b));
+}
 const pad = (n: number) => String(n).padStart(2, '0');
 
 function parsePhoto(url: string | null): string | null {
@@ -431,6 +436,10 @@ function SocialModal({
   const insets = useSafeAreaInsets();
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [localUsers, setLocalUsers] = useState<SocialUser[]>(users);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+
+  // users prop이 변경되면(쿼리 완료 후) localUsers 동기화
+  useEffect(() => { setLocalUsers(users); }, [users]);
 
   async function handleToggle(u: SocialUser) {
     if (!onToggleFollow || pendingIds.has(u.id)) return;
@@ -465,10 +474,12 @@ function SocialModal({
               const pending = pendingIds.has(item.id);
               return (
                 <View style={styles.userRow}>
-                  <View style={styles.userAvatar}>
-                    <Text style={styles.userAvatarText}>{item.displayName[0]}</Text>
-                  </View>
-                  <Text style={[styles.userDisplayName, { flex: 1 }]}>{item.displayName}</Text>
+                  <TouchableOpacity style={styles.userInfo} onPress={() => setProfileUserId(item.id)} activeOpacity={0.7}>
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>{item.displayName[0]}</Text>
+                    </View>
+                    <Text style={styles.userDisplayName}>{item.displayName}</Text>
+                  </TouchableOpacity>
                   {onToggleFollow && (
                     <TouchableOpacity
                       style={[styles.socialFollowBtn, item.isFollowing && styles.socialFollowingBtn]}
@@ -489,50 +500,37 @@ function SocialModal({
           />
         )}
       </View>
+      {profileUserId && (
+        <FriendProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
+      )}
     </Modal>
   );
 }
 
 // ── 히스토리 모달 ──────────────────────────────────
-const HIST_CELL = Math.floor(SCREEN_W / 7);
+const HIST_GAP    = 3;
+const HIST_COL    = 2;
+const HIST_PHOTO  = Math.floor((SCREEN_W - HIST_GAP * (HIST_COL + 1)) / HIST_COL);
 
 function HistoryModal({ onClose }: { onClose: () => void }) {
   const [year,  setYear]  = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [selectedLog, setSelectedLog] = useState<CalendarLog | null>(null);
+  const insets = useSafeAreaInsets();
 
   const { data: calData, isLoading } = useQuery({
     queryKey: ['calendar', year, month],
     queryFn:  () => api.get<{ logs: CalendarLog[] }>(`/workouts/calendar?year=${year}&month=${month}`),
   });
 
-  const logMap = new Map<string, CalendarLog>();
-  (calData?.logs ?? []).forEach((l) => logMap.set(l.localDate, l));
-
-  const firstDay    = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  const logs = (calData?.logs ?? []).sort((a, b) => b.localDate.localeCompare(a.localDate));
 
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <SafeAreaView style={hStyles.container}>
+      <View style={[hStyles.container, { paddingTop: insets.top }]}>
         {selectedLog && (
           <DayDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />
         )}
-
-        <View style={hStyles.header}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={hStyles.close}>닫기</Text>
-          </TouchableOpacity>
-          <Text style={hStyles.title}>운동 히스토리</Text>
-          <View style={{ width: 48 }} />
-        </View>
 
         {/* 월 네비게이션 */}
         <View style={hStyles.nav}>
@@ -541,7 +539,7 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
           }}>
             <Text style={hStyles.navArrow}>‹</Text>
           </TouchableOpacity>
-          <Text style={hStyles.navTitle}>{year}년 {month}월</Text>
+          <Text style={hStyles.navTitle}>{year}년 {month}월 <Text style={hStyles.navCount}>{logs.length}회</Text></Text>
           <TouchableOpacity style={hStyles.navBtn} onPress={() => {
             if (month === 12) { setYear(y => y + 1); setMonth(1); } else setMonth(m => m + 1);
           }}>
@@ -549,96 +547,78 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
           </TouchableOpacity>
         </View>
 
-        {/* 요일 헤더 */}
-        <View style={hStyles.weekRow}>
-          {WEEKDAYS.map((d, i) => (
-            <Text key={d} style={[hStyles.weekDay, i === 0 && { color: '#e05555' }, i === 6 && { color: '#4f8ef7' }]}>
-              {d}
-            </Text>
-          ))}
-        </View>
-
         {isLoading ? (
-          <ActivityIndicator color="#4f8ef7" style={{ marginTop: 40 }} />
+          <ActivityIndicator color="#4f8ef7" style={{ marginTop: 60 }} />
+        ) : logs.length === 0 ? (
+          <View style={hStyles.empty}>
+            <Text style={hStyles.emptyIcon}>🏋️</Text>
+            <Text style={hStyles.emptyText}>이달 운동 기록이 없어요</Text>
+          </View>
         ) : (
-          <ScrollView>
-            <View style={hStyles.grid}>
-              {cells.map((day, idx) => {
-                if (!day) return <View key={`e${idx}`} style={hStyles.cell} />;
-
-                const dateStr = `${year}-${pad(month)}-${pad(day)}`;
-                const log     = logMap.get(dateStr);
-                const photo   = log ? parsePhoto(log.photoUrl) : null;
-                const isToday = dateStr === today;
-                const dow     = idx % 7;
-
-                return (
-                  <TouchableOpacity
-                    key={dateStr}
-                    style={hStyles.cell}
-                    onPress={() => { if (log) setSelectedLog(log); }}
-                    activeOpacity={log ? 0.75 : 1}
-                  >
-                    {photo ? (
-                      <View style={hStyles.photoCell}>
-                        <Image source={{ uri: photo }} style={hStyles.photo} />
-                        <Text style={hStyles.photoDay}>{day}</Text>
-                      </View>
-                    ) : (
-                      <View style={[
-                        hStyles.emptyCell,
-                        isToday && hStyles.todayCell,
-                        log && !isToday && hStyles.loggedCell,
-                      ]}>
-                        <Text style={[
-                          hStyles.dayNum,
-                          dow === 0 && { color: '#e05555' },
-                          dow === 6 && { color: '#4f8ef7' },
-                          isToday && { color: '#fff' },
-                          log && !isToday && { color: '#4caf50' },
-                        ]}>
-                          {day}
-                        </Text>
-                        {log && <View style={hStyles.dot} />}
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          <ScrollView contentContainerStyle={hStyles.grid}>
+            {logs.map((log) => {
+              const photo = parsePhoto(log.photoUrl);
+              const [, , day] = log.localDate.split('-');
+              return (
+                <TouchableOpacity
+                  key={log.id}
+                  style={hStyles.cell}
+                  onPress={() => setSelectedLog(log)}
+                  activeOpacity={0.85}
+                >
+                  {photo ? (
+                    <Image source={{ uri: photo }} style={hStyles.photo} resizeMode="cover" />
+                  ) : (
+                    <View style={hStyles.noPhoto}>
+                      <Text style={hStyles.noPhotoIcon}>💪</Text>
+                    </View>
+                  )}
+                  <View style={hStyles.dateTag}>
+                    <Text style={hStyles.dateText}>{parseInt(day, 10)}일</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         )}
-      </SafeAreaView>
+
+        {/* 하단 닫기 버튼 */}
+        <View style={[hStyles.footer, { paddingBottom: insets.bottom + 12 }]}>
+          <TouchableOpacity style={hStyles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+            <Text style={hStyles.closeBtnText}>닫기</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 }
 
 const hStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f' },
-  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
-  title:     { color: '#fff', fontSize: 17, fontWeight: '700' },
-  close:     { color: '#4f8ef7', fontSize: 16 },
+  container: { flex: 1, backgroundColor: '#0a0a0a' },
 
-  nav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 12 },
+  nav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#1c1c1e' },
   navBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   navArrow:  { color: '#4f8ef7', fontSize: 32 },
   navTitle:  { color: '#fff', fontSize: 18, fontWeight: '700' },
+  navCount:  { color: '#636366', fontSize: 14, fontWeight: '400' },
 
-  weekRow:   { flexDirection: 'row' },
-  weekDay:   { width: HIST_CELL, textAlign: 'center', color: '#555', fontSize: 11, fontWeight: '600', paddingBottom: 6 },
+  grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: HIST_GAP, padding: HIST_GAP },
 
-  grid:      { flexDirection: 'row', flexWrap: 'wrap' },
-  cell:      { width: HIST_CELL, height: HIST_CELL, padding: 1 },
+  cell:      { width: HIST_PHOTO, height: HIST_PHOTO, borderRadius: 10, overflow: 'hidden', position: 'relative' },
+  photo:     { width: '100%', height: '100%' },
+  noPhoto:   { width: '100%', height: '100%', backgroundColor: '#1c1c1e', alignItems: 'center', justifyContent: 'center' },
+  noPhotoIcon: { fontSize: 36 },
 
-  photoCell: { flex: 1, position: 'relative' },
-  photo:     { width: '100%', height: '100%', borderRadius: 4 },
-  photoDay:  { position: 'absolute', bottom: 3, left: 4, color: '#fff', fontSize: 10, fontWeight: '700', textShadowColor: '#000', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  dateTag:   { position: 'absolute', bottom: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  dateText:  { color: '#fff', fontSize: 12, fontWeight: '700' },
 
-  emptyCell: { flex: 1, borderRadius: 4, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  todayCell: { backgroundColor: '#4f8ef7' },
-  loggedCell:{ backgroundColor: '#1a2e1a' },
-  dayNum:    { color: '#444', fontSize: 13, fontWeight: '600' },
-  dot:       { width: 4, height: 4, borderRadius: 2, backgroundColor: '#4caf50' },
+  empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  emptyIcon: { fontSize: 48 },
+  emptyText: { color: '#636366', fontSize: 15 },
+
+  footer:    { paddingHorizontal: 20, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1c1c1e' },
+  closeBtn:  { backgroundColor: '#1c1c1e', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  closeBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
 
 // ── 메인 스크린 ─────────────────────────────────────
@@ -725,13 +705,15 @@ export default function ProfileScreen() {
   const { data: followersData, refetch: refetchFollowers } = useQuery({
     queryKey: ['followers', user?.id],
     queryFn:  () => api.get<{ users: SocialUser[] }>(`/users/${user!.id}/followers`),
-    enabled:  !!user && socialType === 'followers',
+    enabled:  !!user,
+    staleTime: 60_000,
   });
 
   const { data: followingData, refetch: refetchFollowing } = useQuery({
     queryKey: ['following', user?.id],
     queryFn:  () => api.get<{ users: SocialUser[] }>(`/users/${user!.id}/following`),
-    enabled:  !!user && socialType === 'following',
+    enabled:  !!user,
+    staleTime: 60_000,
   });
 
   const { data: rankingData } = useQuery({
@@ -916,19 +898,19 @@ export default function ProfileScreen() {
             <View style={styles.settingsList}>
               <TouchableOpacity style={styles.settingsItem} onPress={openSchedulePanel}>
                 <View style={styles.menuIconWrap}><CalendarIcon size={20} color="#8e8e93" /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.settingsItemLabel}>운동 계획</Text>
-                  <Text style={styles.menuSub}>
-                    {scheduleDays.length === 0 ? '미설정' : `주 ${scheduleDays.length}회 · ${scheduleDays.map(d => ['일','월','화','수','목','금','토'][d]).join('·')}`}
+                <View style={styles.menuTextWrap}>
+                  <Text style={styles.menuItemLabel}>운동 계획</Text>
+                  <Text style={styles.menuSub} numberOfLines={1}>
+                    {scheduleDays.length === 0 ? '미설정' : `주 ${scheduleDays.length}회 · ${sortMonFirst(scheduleDays).map(d => WEEKDAYS[d]).join('·')}`}
                   </Text>
                 </View>
                 <ChevronRightIcon />
               </TouchableOpacity>
               <TouchableOpacity style={styles.settingsItem} onPress={openSplitPanel}>
                 <View style={styles.menuIconWrap}><DumbbellIcon size={20} color="#8e8e93" /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.settingsItemLabel}>운동 분할</Text>
-                  <Text style={styles.menuSub}>
+                <View style={styles.menuTextWrap}>
+                  <Text style={styles.menuItemLabel}>운동 분할</Text>
+                  <Text style={styles.menuSub} numberOfLines={1}>
                     {splitData?.config
                       ? `${splitData.config.slots.length}분할 · 다음: ${splitData.config.slots[splitData.todaySlotIndex ?? 0]?.label}`
                       : '미설정'}
@@ -1021,7 +1003,7 @@ export default function ProfileScreen() {
                   <Text style={styles.scheduleInfoText}>
                     {scheduleDays.length === 0
                       ? '요일을 선택해주세요'
-                      : `주 ${scheduleDays.length}회 · ${scheduleDays.map(d => ['일','월','화','수','목','금','토'][d]).join('·')} 운동`}
+                      : `주 ${scheduleDays.length}회 · ${sortMonFirst(scheduleDays).map(d => WEEKDAYS[d]).join('·')} 운동`}
                   </Text>
                 </View>
               </View>
@@ -1309,6 +1291,8 @@ const styles = StyleSheet.create({
   menuCard:      { marginHorizontal: 16, backgroundColor: '#1c1c1e', borderRadius: 18, overflow: 'hidden', marginBottom: 12 },
   menuItem:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 16, gap: 14 },
   menuIconWrap:  { width: 26, alignItems: 'center' },
+  menuTextWrap:  { flex: 1, justifyContent: 'center' },
+  menuItemLabel: { color: '#fff', fontSize: 16, fontWeight: '400' },
   menuIcon:      { fontSize: 20, width: 26, textAlign: 'center' },
   menuLabel:     { flex: 1, color: '#fff', fontSize: 15, fontWeight: '500' },
   menuSub:       { color: '#8e8e93', fontSize: 12, marginTop: 1 },
@@ -1323,6 +1307,7 @@ const styles = StyleSheet.create({
 
   // ── 소셜 목록
   userRow:         { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 0.5, borderBottomColor: '#2c2c2e' },
+  userInfo:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
   userAvatar:      { width: 46, height: 46, borderRadius: 23, backgroundColor: '#1c3a6e', alignItems: 'center', justifyContent: 'center' },
   userAvatarText:  { color: '#fff', fontWeight: '700', fontSize: 18 },
   userDisplayName: { color: '#fff', fontSize: 16, fontWeight: '600' },
@@ -1343,7 +1328,7 @@ const styles = StyleSheet.create({
   settingsList:      { marginTop: 8 },
   settingsItem:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 0.5, borderBottomColor: '#2c2c2e', gap: 14 },
   settingsItemIcon:  { fontSize: 20, width: 26, textAlign: 'center' }, // unused (kept for compat)
-  settingsItemLabel: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '400' },
+  settingsItemLabel: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '400', flexShrink: 1 },
   settingsItemArrow: { color: '#636366', fontSize: 20 },
 
   // ── 아바타
