@@ -558,8 +558,10 @@ export default function HomeScreen() {
 
       {/* ── 헤더 ── */}
       <View style={styles.headerBar}>
-        <Text style={styles.headerLeft}>오늘</Text>
-        <Text style={styles.headerDate}>{getKoreanDate()}</Text>
+        <View>
+          <Text style={styles.headerLeft}>FitStreak</Text>
+          <Text style={styles.headerDate}>{getKoreanDate()}</Text>
+        </View>
       </View>
       <View style={styles.headerDivider} />
 
@@ -642,22 +644,23 @@ const styles = StyleSheet.create({
   // 헤더
   headerBar: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 14,
+    paddingBottom: 12,
   },
   headerLeft: {
     color: C.primary,
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   headerDate: {
     color: C.secondary,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '400',
+    marginTop: 2,
   },
   headerDivider: {
     height: 1,

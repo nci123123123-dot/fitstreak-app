@@ -9,6 +9,13 @@ import { api } from '../../src/api/client';
 import { SearchIcon } from '../../src/components/Icons';
 import FriendProfileModal from '../../src/components/FriendProfileModal';
 
+const AVATAR_COLORS = ['#4f8ef7', '#f7a84f', '#30d158', '#bf5af2', '#ff6b6b', '#0dd3c5'];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
 interface SearchUser {
   id: string;
   displayName: string;
@@ -112,7 +119,7 @@ export default function SearchScreen() {
                   {item.profilePhoto ? (
                     <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
                   ) : (
-                    <View style={styles.avatarFallback}>
+                    <View style={[styles.avatarFallback, { backgroundColor: avatarColor(item.displayName) }]}>
                       <Text style={styles.avatarLetter}>{item.displayName[0]}</Text>
                     </View>
                   )}
@@ -186,7 +193,7 @@ const styles = StyleSheet.create({
   },
   userInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar:        { width: 48, height: 48, borderRadius: 24 },
-  avatarFallback:{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#1c3a6e', alignItems: 'center', justifyContent: 'center' },
+  avatarFallback:{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   avatarLetter:  { color: '#fff', fontSize: 20, fontWeight: '700' },
 
   nameCol:       { flex: 1, gap: 3 },

@@ -136,7 +136,7 @@ export default function FriendsNudge() {
                     styles.nudgeBtnText,
                     alreadyNudged && styles.nudgeBtnTextDone,
                   ]}>
-                    {alreadyNudged ? '독려완료' : '운동가라 💪'}
+                    {alreadyNudged ? '✓ 독려완료' : '💪 독려하기'}
                   </Text>
                 )}
               </TouchableOpacity>

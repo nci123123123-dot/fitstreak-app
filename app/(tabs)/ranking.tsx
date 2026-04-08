@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect, router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { api } from '../../src/api/client';
-import { FlameIcon } from '../../src/components/Icons';
+import { FlameIcon, ChevronRightIcon } from '../../src/components/Icons';
 import FriendProfileModal from '../../src/components/FriendProfileModal';
 
 interface RankEntry {
@@ -160,6 +160,7 @@ function RankRow({ entry, rank, onPress }: { entry: RankEntry; rank: number; onP
           <Text style={rowStyles.streakNum}>{entry.currentStreak}</Text>
           <Text style={rowStyles.streakUnit}>일</Text>
         </View>
+        {!entry.isMe && <ChevronRightIcon size={16} color="#3a3a3c" strokeWidth={2} />}
       </View>
     </TouchableOpacity>
   );

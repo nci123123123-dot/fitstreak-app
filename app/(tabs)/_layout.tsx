@@ -6,14 +6,21 @@ import {
   PlusIcon, SearchIcon, TrophyIcon,
 } from '../../src/components/Icons';
 
-// 탭바 콘텐츠 영역 기본 높이 (아이콘 + 라벨)
 const TAB_CONTENT_HEIGHT = 56;
+
+// 탭 아이콘 래퍼 — active 일 때 위에 파란 dot 표시
+function TabIconWrap({ focused, children }: { focused: boolean; children: React.ReactNode }) {
+  return (
+    <View style={tabWrap.container}>
+      <View style={[tabWrap.dot, focused && tabWrap.dotActive]} />
+      {children}
+    </View>
+  );
+}
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-
-  // 시스템 내비게이션 바(제스처/버튼 모두)를 탭바 안에 흡수
-  const tabBarHeight    = TAB_CONTENT_HEIGHT + insets.bottom;
+  const tabBarHeight        = TAB_CONTENT_HEIGHT + insets.bottom;
   const tabBarPaddingBottom = insets.bottom + 4;
 
   return (
@@ -26,70 +33,80 @@ export default function TabLayout() {
           borderTopWidth: 0.5,
           height: tabBarHeight,
           paddingBottom: tabBarPaddingBottom,
-          paddingTop: 8,
+          paddingTop: 6,
         },
         tabBarActiveTintColor:   '#ffffff',
         tabBarInactiveTintColor: '#48484a',
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: '500',
-          letterSpacing: 0.3,
-          marginTop: 3,
+          fontWeight: '600',
+          letterSpacing: 0.2,
+          marginTop: 2,
         },
       }}
     >
-      {/* 1 */}
+      {/* 홈 */}
       <Tabs.Screen
         name="home"
         options={{
-          title: '피드',
-          tabBarIcon: ({ focused }) =>
-            focused
-              ? <HomeFilledIcon size={24} color="#ffffff" />
-              : <HomeIcon size={24} color="#48484a" />,
+          title: '홈',
+          tabBarIcon: ({ focused }) => (
+            <TabIconWrap focused={focused}>
+              {focused
+                ? <HomeFilledIcon size={24} color="#ffffff" />
+                : <HomeIcon size={24} color="#48484a" />}
+            </TabIconWrap>
+          ),
         }}
       />
-      {/* 2 */}
+      {/* 검색 */}
       <Tabs.Screen
         name="search"
         options={{
           title: '검색',
           tabBarIcon: ({ focused }) => (
-            <SearchIcon size={24} color={focused ? '#ffffff' : '#48484a'} strokeWidth={focused ? 2.2 : 1.8} />
+            <TabIconWrap focused={focused}>
+              <SearchIcon size={24} color={focused ? '#ffffff' : '#48484a'} strokeWidth={focused ? 2.2 : 1.8} />
+            </TabIconWrap>
           ),
         }}
       />
-      {/* 3 — 정중앙 */}
+      {/* 기록 (정중앙 FAB) */}
       <Tabs.Screen
         name="log"
         options={{
           title: '',
           tabBarIcon: () => (
             <View style={[styles.recordBtn, { marginBottom: insets.bottom > 0 ? insets.bottom / 2 : 6 }]}>
-              <PlusIcon size={22} color="#fff" strokeWidth={2.5} />
+              <PlusIcon size={24} color="#fff" strokeWidth={2.5} />
             </View>
           ),
         }}
       />
-      {/* 4 */}
+      {/* 랭킹 */}
       <Tabs.Screen
         name="ranking"
         options={{
           title: '랭킹',
           tabBarIcon: ({ focused }) => (
-            <TrophyIcon size={24} color={focused ? '#ffffff' : '#48484a'} strokeWidth={focused ? 2.2 : 1.8} />
+            <TabIconWrap focused={focused}>
+              <TrophyIcon size={24} color={focused ? '#ffffff' : '#48484a'} strokeWidth={focused ? 2.2 : 1.8} />
+            </TabIconWrap>
           ),
         }}
       />
-      {/* 5 */}
+      {/* 프로필 */}
       <Tabs.Screen
         name="profile"
         options={{
           title: '프로필',
-          tabBarIcon: ({ focused }) =>
-            focused
-              ? <PersonFilledIcon size={24} color="#ffffff" />
-              : <PersonIcon size={24} color="#48484a" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIconWrap focused={focused}>
+              {focused
+                ? <PersonFilledIcon size={24} color="#ffffff" />
+                : <PersonIcon size={24} color="#48484a" />}
+            </TabIconWrap>
+          ),
         }}
       />
       <Tabs.Screen name="feed" options={{ href: null }} />
@@ -97,17 +114,23 @@ export default function TabLayout() {
   );
 }
 
+const tabWrap = StyleSheet.create({
+  container: { alignItems: 'center', gap: 3 },
+  dot:       { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent' },
+  dotActive: { backgroundColor: '#4f8ef7' },
+});
+
 const styles = StyleSheet.create({
   recordBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: '#4f8ef7',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4f8ef7',
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
